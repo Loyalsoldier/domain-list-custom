@@ -1,0 +1,92 @@
+name: Build geosite.dat
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 21 * * *"
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - "**/README.md"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.15
+
+      - name: Set variables
+        run: |
+          echo "RELEASE_NAME=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+          echo "TAG_NAME=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
+        shell: bash
+
+      - name: Checkout codebase
+        uses: actions/checkout@v2
+
+      - name: Checkout v2fly/domain-list-community
+        uses: actions/checkout@v2
+        with:
+          repository: v2fly/domain-list-community
+          path: domain-list-community
+
+      - name: Append attribute rules
+        run: |
+          echo "include:geolocation-!cn@cn" >> ./domain-list-community/data/cn
+          echo "include:geolocation-cn@!cn" >> ./domain-list-community/data/geolocation-\!cn
+
+      - name: Get dependencies and run
+        run: |
+          go mod download
+          go run ./ --datapath=./domain-list-community/data
+
+      - name: Rename to geosite.dat && generate sha256 hash
+        run: |
+          cd publish || exit 1
+          mv dlc.dat geosite.dat
+          sha256sum geosite.dat > geosite.dat.sha256sum
+
+      - name: Git push assets to "release" branch
+        run: |
+          cd publish || exit 1
+          git init
+          git config --local user.name "actions"
+          git config --local user.email "action@github.com"
+          git checkout -b release
+          git add .
+          git commit -m "${{ env.RELEASE_NAME }}"
+          git remote add publish "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
+          git push -f publish release
+
+      - name: Create a release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          release_name: ${{ env.RELEASE_NAME }}
+          draft: false
+          prerelease: false
+
+      - name: Upload geosite.dat
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./publish/geosite.dat
+          asset_name: geosite.dat
+          asset_content_type: application/octet-stream
+
+      - name: Upload geosite.dat sha256sum
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./publish/geosite.dat.sha256sum
+          asset_name: geosite.dat.sha256sum
+          asset_content_type: text/plain
