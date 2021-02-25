@@ -14,6 +14,7 @@ import (
 
 var (
 	dataPath     = flag.String("datapath", filepath.Join("./", "data"), "Path to your custom 'data' directory")
+	datName      = flag.String("datname", "geosite.dat", "Name of the generated dat file")
 	outputPath   = flag.String("outputpath", "./publish", "Output path to the generated files")
 	exportLists  = flag.String("exportlists", "category-ads-all,tld-cn,cn,geolocation-cn,tld-!cn,geolocation-!cn,private,apple,icloud,google,steam", "Lists to be exported in plaintext format, separated by ',' comma")
 	excludeAttrs = flag.String("excludeattrs", "cn@!cn@ads,geolocation-cn@!cn@ads,geolocation-!cn@cn@ads", "Exclude rules with certain attributes in certain lists, seperated by ',' comma, support multiple attributes in one list. Example: geolocation-!cn@cn@ads,geolocation-cn@!cn")
@@ -88,11 +89,11 @@ func main() {
 			fmt.Println("Failed:", err)
 			os.Exit(1)
 		}
-		if err := ioutil.WriteFile(filepath.Join(*outputPath, "dlc.dat"), protoBytes, 0644); err != nil {
+		if err := ioutil.WriteFile(filepath.Join(*outputPath, *datName), protoBytes, 0644); err != nil {
 			fmt.Println("Failed:", err)
 			os.Exit(1)
 		} else {
-			fmt.Printf("dlc.dat has been generated successfully in '%s'. You can rename 'dlc.dat' to 'geosite.dat' and use it in V2Ray.\n", *outputPath)
+			fmt.Printf("%s has been generated successfully in '%s'.", *datName, *outputPath)
 		}
 	}
 

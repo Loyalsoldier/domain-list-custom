@@ -15,7 +15,7 @@ jobs:
       - name: Setup Go 1.x
         uses: actions/setup-go@v2
         with:
-          go-version: ^1.15
+          go-version: ^1.16
 
       - name: Compare latest tags and set variables
         run: |
@@ -48,14 +48,12 @@ jobs:
       - name: Get dependencies and run
         if: ${{ env.NeedToSync }}
         run: |
-          go mod download
           go run ./ --datapath=./domain-list-community/data
 
-      - name: Rename to geosite.dat && generate sha256 hash
+      - name: Generate sha256 hashsum
         if: ${{ env.NeedToSync }}
         run: |
           cd publish || exit 1
-          mv dlc.dat geosite.dat
           sha256sum geosite.dat > geosite.dat.sha256sum
 
       - name: Git push assets to "release" branch

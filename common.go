@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"v2ray.com/core/common"
+	"github.com/v2fly/v2ray-core/v4/common"
 )
 
 type fileName string
@@ -31,11 +31,10 @@ func GetDataDir() string {
 		fmt.Printf("Use domain list files in '%s' directory.\n", dir)
 		return dir
 	}
-	goPath := common.GetGOPATH()
 	pwd, wdErr := os.Getwd()
 	if wdErr != nil {
 		fmt.Println("Failed: cannot get current working directory", wdErr)
-		fmt.Println("Please run in the root path to the project")
+		fmt.Println("Notice: please run in project root directory")
 		os.Exit(1)
 	}
 	moduleName, mnErr := common.GetModuleName(pwd)
@@ -44,6 +43,7 @@ func GetDataDir() string {
 		os.Exit(1)
 	}
 	modulePath := filepath.Join(strings.Split(moduleName, "/")...)
+	goPath := common.GetGOPATH()
 	dir = filepath.Join(goPath, "src", modulePath, "data")
 	fmt.Println("Use $GOPATH:", goPath)
 	fmt.Printf("Use domain list files in '%s' directory.\n", dir)

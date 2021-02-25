@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"v2ray.com/core/app/router"
+	"github.com/v2fly/v2ray-core/v4/app/router"
 )
 
 // ListInfoMap is the map of files in data directory and ListInfo

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"v2ray.com/core/app/router"
+	"github.com/v2fly/v2ray-core/v4/app/router"
 )
 
 // ListInfo is the information structure of a single file in data directory.
