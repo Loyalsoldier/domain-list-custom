@@ -32,7 +32,6 @@ type ListInfo struct {
 // NewListInfo return a ListInfo
 func NewListInfo() *ListInfo {
 	return &ListInfo{
-		HasInclusion:            false,
 		InclusionAttributeMap:   make(map[fileName][]attribute),
 		FullTypeList:            make([]*router.Domain, 0, 10),
 		KeywordTypeList:         make([]*router.Domain, 0, 10),
@@ -123,11 +122,15 @@ func (l *ListInfo) parseDomain(domain string, rule *router.Domain) error {
 			case 1: // Inclusion without attribute
 				// Use '@' as the placeholder attribute for 'include:filename'
 				l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"))
-			case 2: // Inclusion with attribute
-				// Added in this format: '@cn'
-				l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"+strings.TrimSpace(kv2[1])))
-			default:
-				return errors.New("invalid format for inclusion: " + domain)
+			default: // Inclusion with attribute(s)
+				// support new inclusion syntax, eg: `include:google @cn @gfw`
+				for _, attr := range kv2[1:] {
+					attr = strings.ToLower(strings.TrimSpace(attr))
+					if attr != "" {
+						// Added in this format: '@cn'
+						l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"+attr))
+					}
+				}
 			}
 		default: // line begins with "full" / "domain" / "regexp" / "keyword"
 			rule.Value = strings.ToLower(ruleVal)
