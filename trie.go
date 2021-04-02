@@ -29,10 +29,6 @@ func (n *node) addChild(s string, child *node) {
 	n.children[s] = child
 }
 
-func (n *node) setLeaf() {
-	n.leaf = true
-}
-
 func (n *node) isLeaf() bool {
 	return n.leaf
 }

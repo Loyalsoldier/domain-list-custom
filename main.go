@@ -93,7 +93,7 @@ func main() {
 			fmt.Println("Failed:", err)
 			os.Exit(1)
 		} else {
-			fmt.Printf("%s has been generated successfully in '%s'.", *datName, *outputPath)
+			fmt.Printf("%s has been generated successfully in '%s'.\n", *datName, *outputPath)
 		}
 	}
 
