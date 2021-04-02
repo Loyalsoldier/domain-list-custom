@@ -32,7 +32,6 @@ type ListInfo struct {
 // NewListInfo return a ListInfo
 func NewListInfo() *ListInfo {
 	return &ListInfo{
-		HasInclusion:            false,
 		InclusionAttributeMap:   make(map[fileName][]attribute),
 		FullTypeList:            make([]*router.Domain, 0, 10),
 		KeywordTypeList:         make([]*router.Domain, 0, 10),
@@ -62,6 +61,9 @@ func (l *ListInfo) ProcessList(file *os.File) error {
 		if err != nil {
 			return err
 		}
+		if parsedRule == nil {
+			continue
+		}
 		l.classifyRule(parsedRule)
 	}
 	if err := scanner.Err(); err != nil {
@@ -74,78 +76,85 @@ func (l *ListInfo) ProcessList(file *os.File) error {
 // parseRule parses a single rule
 func (l *ListInfo) parseRule(line string) (*router.Domain, error) {
 	line = strings.TrimSpace(line)
-	parts := strings.Split(line, " ")
 
-	if len(parts) == 0 {
-		return nil, errors.New("empty rule")
+	if line == "" {
+		return nil, errors.New("empty line")
 	}
 
+	// Parse `include` rule first, eg: `include:google`, `include:google @cn @gfw`
+	if strings.HasPrefix(line, "include:") {
+		l.parseInclusion(line)
+		return nil, nil
+	}
+
+	parts := strings.Split(line, " ")
 	ruleWithType := strings.TrimSpace(parts[0])
-	if len(ruleWithType) == 0 {
+	if ruleWithType == "" {
 		return nil, errors.New("empty rule")
 	}
 
 	var rule router.Domain
-	if err := l.parseDomain(ruleWithType, &rule); err != nil {
+	if err := l.parseTypeRule(ruleWithType, &rule); err != nil {
 		return nil, err
 	}
 
-	for i := 1; i < len(parts); i++ {
-		partI := strings.TrimSpace(parts[i])
-		if len(partI) == 0 {
-			continue
+	for _, attrString := range parts[1:] {
+		if attrString = strings.TrimSpace(attrString); attrString != "" {
+			attr, err := l.parseAttribute(attrString)
+			if err != nil {
+				return nil, err
+			}
+			rule.Attribute = append(rule.Attribute, attr)
 		}
-		attr, err := l.parseAttribute(partI)
-		if err != nil {
-			return nil, err
-		}
-		rule.Attribute = append(rule.Attribute, attr)
 	}
 
 	return &rule, nil
 }
 
-func (l *ListInfo) parseDomain(domain string, rule *router.Domain) error {
+func (l *ListInfo) parseInclusion(inclusion string) {
+	inclusionVal := strings.TrimPrefix(strings.TrimSpace(inclusion), "include:")
+	l.HasInclusion = true
+	inclusionValSlice := strings.Split(inclusionVal, "@")
+	filename := fileName(strings.ToUpper(strings.TrimSpace(inclusionValSlice[0])))
+	switch len(inclusionValSlice) {
+	case 1: // Inclusion without attribute
+		// Use '@' as the placeholder attribute for 'include:filename'
+		l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"))
+	default: // Inclusion with attribute(s)
+		// support new inclusion syntax, eg: `include:google @cn @gfw`
+		for _, attr := range inclusionValSlice[1:] {
+			attr = strings.ToLower(strings.TrimSpace(attr))
+			if attr != "" {
+				// Added in this format: '@cn'
+				l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"+attr))
+			}
+		}
+	}
+}
+
+func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
 	kv := strings.Split(domain, ":")
 	switch len(kv) {
 	case 1: // line without type prefix
 		rule.Type = router.Domain_Domain
-		rule.Value = strings.ToLower(kv[0])
-	case 2: // line with type/include prefix
+		rule.Value = strings.ToLower(strings.TrimSpace(kv[0]))
+	case 2: // line with type prefix
 		ruleType := strings.TrimSpace(kv[0])
 		ruleVal := strings.TrimSpace(kv[1])
-		switch ruleType {
-		case "include": // line begins with "include"
-			l.HasInclusion = true
-			kv2 := strings.Split(ruleVal, "@")
-			filename := fileName(strings.ToUpper(strings.TrimSpace(kv2[0])))
-			switch len(kv2) {
-			case 1: // Inclusion without attribute
-				// Use '@' as the placeholder attribute for 'include:filename'
-				l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"))
-			case 2: // Inclusion with attribute
-				// Added in this format: '@cn'
-				l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"+strings.TrimSpace(kv2[1])))
-			default:
-				return errors.New("invalid format for inclusion: " + domain)
-			}
-		default: // line begins with "full" / "domain" / "regexp" / "keyword"
-			rule.Value = strings.ToLower(ruleVal)
-			switch ruleType {
-			case "full":
-				rule.Type = router.Domain_Full
-			case "domain":
-				rule.Type = router.Domain_Domain
-			case "keyword":
-				rule.Type = router.Domain_Plain
-			case "regexp":
-				rule.Type = router.Domain_Regex
-			default:
-				return errors.New("unknown domain type: " + ruleType)
-			}
+		rule.Value = strings.ToLower(ruleVal)
+		switch strings.ToLower(ruleType) {
+		case "full":
+			rule.Type = router.Domain_Full
+		case "domain":
+			rule.Type = router.Domain_Domain
+		case "keyword":
+			rule.Type = router.Domain_Plain
+		case "regexp":
+			rule.Type = router.Domain_Regex
+			rule.Value = ruleVal
+		default:
+			return errors.New("unknown domain type: " + ruleType)
 		}
-	default:
-		return errors.New("invalid format: " + domain)
 	}
 	return nil
 }
@@ -168,7 +177,7 @@ func (l *ListInfo) classifyRule(rule *router.Domain) {
 		l.AttributeRuleUniqueList = append(l.AttributeRuleUniqueList, rule)
 		var attrsString attribute
 		for _, attr := range rule.Attribute {
-			attrsString += attribute("@" + attr.GetKey()) // attrsString will be "@cn@ads" if there are more than one attribute
+			attrsString += attribute("@" + attr.GetKey()) // attrsString will be "@cn@ads" if there are more than one attributes
 		}
 		l.AttributeRuleListMap[attrsString] = append(l.AttributeRuleListMap[attrsString], rule)
 	} else {
@@ -213,9 +222,9 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 						// will be like: "@cn@ads".
 						// So if to extract rules with a specific attribute, it is necessary
 						// also to test the multi-attribute keys of AttributeRuleListMap.
-						// Notice: if "include:google@cn" and "include:google@ads" appear
+						// Notice: if "include:google @cn" and "include:google @ads" appear
 						// at the same time in the parent list. There are chances that the same
-						// rule with two attributes will be included twice in the parent list.
+						// rule with that two attributes(`@cn` and `@ads`) will be included twice in the parent list.
 						if strings.Contains(string(attr)+"@", string(attrWanted)+"@") {
 							l.AttributeRuleListMap[attr] = append(l.AttributeRuleListMap[attr], domainList...)
 							l.AttributeRuleUniqueList = append(l.AttributeRuleUniqueList, domainList...)
