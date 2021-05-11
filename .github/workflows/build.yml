@@ -83,7 +83,7 @@ jobs:
 
       - name: Upload geosite.dat
         if: ${{ env.NeedToSync }}
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -94,7 +94,7 @@ jobs:
 
       - name: Upload geosite.dat sha256sum
         if: ${{ env.NeedToSync }}
-        uses: actions/upload-release-asset@v1
+        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
