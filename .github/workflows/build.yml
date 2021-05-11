@@ -29,12 +29,12 @@ jobs:
         shell: bash
 
       - name: Checkout codebase
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
         if: ${{ env.NeedToSync }}
 
       - name: Checkout v2fly/domain-list-community
         if: ${{ env.NeedToSync }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v2.3.4
         with:
           repository: v2fly/domain-list-community
           path: domain-list-community
