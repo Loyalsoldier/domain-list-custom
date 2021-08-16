@@ -1,0 +1,13 @@
+full:router.asus.com
+domain:lan
+domain:localdomain
+domain:example
+domain:invalid
+domain:localhost
+domain:test
+domain:local
+domain:home.arpa
+domain:msftconnecttest.com
+domain:localhost.sec.qq.com
+domain:localhost.ptlogin2.qq.com
+regexp:^[^.]+$
