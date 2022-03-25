@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/v2fly/v2ray-core/v4/app/router"
+	router "github.com/v2fly/v2ray-core/v5/app/router/routercommon"
 )
 
 // ListInfo is the information structure of a single file in data directory.
@@ -136,7 +136,7 @@ func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
 	kv := strings.Split(domain, ":")
 	switch len(kv) {
 	case 1: // line without type prefix
-		rule.Type = router.Domain_Domain
+		rule.Type = router.Domain_RootDomain
 		rule.Value = strings.ToLower(strings.TrimSpace(kv[0]))
 	case 2: // line with type prefix
 		ruleType := strings.TrimSpace(kv[0])
@@ -146,7 +146,7 @@ func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
 		case "full":
 			rule.Type = router.Domain_Full
 		case "domain":
-			rule.Type = router.Domain_Domain
+			rule.Type = router.Domain_RootDomain
 		case "keyword":
 			rule.Type = router.Domain_Plain
 		case "regexp":
@@ -184,7 +184,7 @@ func (l *ListInfo) classifyRule(rule *router.Domain) {
 		switch rule.Type {
 		case router.Domain_Full:
 			l.FullTypeList = append(l.FullTypeList, rule)
-		case router.Domain_Domain:
+		case router.Domain_RootDomain:
 			l.DomainTypeList = append(l.DomainTypeList, rule)
 		case router.Domain_Plain:
 			l.KeywordTypeList = append(l.KeywordTypeList, rule)
@@ -303,7 +303,7 @@ func (l *ListInfo) ToPlainText() []byte {
 		switch rule.Type {
 		case router.Domain_Full:
 			ruleString = "full:" + ruleVal
-		case router.Domain_Domain:
+		case router.Domain_RootDomain:
 			ruleString = "domain:" + ruleVal
 		case router.Domain_Plain:
 			ruleString = "keyword:" + ruleVal
@@ -349,7 +349,7 @@ func (l *ListInfo) ToGFWList() []byte {
 		case router.Domain_Full:
 			gfwlistBytes = append(gfwlistBytes, []byte("|http://"+ruleVal+"\n")...)
 			gfwlistBytes = append(gfwlistBytes, []byte("|https://"+ruleVal+"\n")...)
-		case router.Domain_Domain:
+		case router.Domain_RootDomain:
 			gfwlistBytes = append(gfwlistBytes, []byte("||"+ruleVal+"\n")...)
 		case router.Domain_Plain:
 			gfwlistBytes = append(gfwlistBytes, []byte(ruleVal+"\n")...)
