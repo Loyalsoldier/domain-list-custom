@@ -11,16 +11,12 @@
 
 ## 下载地址
 
-> 如果无法访问域名 `raw.githubusercontent.com`，可以使用第二个地址（`cdn.jsdelivr.net`），但是内容更新会有 12 小时的延迟。
-
-- [https://raw.githubusercontent.com/Loyalsoldier/domain-list-custom/release/geosite.dat](https://raw.githubusercontent.com/Loyalsoldier/domain-list-custom/release/geosite.dat)
-- [https://cdn.jsdelivr.net/gh/Loyalsoldier/domain-list-custom@release/geosite.dat](https://cdn.jsdelivr.net/gh/Loyalsoldier/domain-list-custom@release/geosite.dat)
+[https://github.com/Loyalsoldier/domain-list-custom/releases/latest/download/geosite.dat](https://github.com/Loyalsoldier/domain-list-custom/releases/latest/download/geosite.dat)
 
 ## 使用本项目的项目
 
-- [@Loyalsoldier/v2ray-rules-dat](https://github.com/Loyalsoldier/v2ray-rules-dat)
+[@Loyalsoldier/v2ray-rules-dat](https://github.com/Loyalsoldier/v2ray-rules-dat)
 
 ## 激赏 | Donation
 
-- **比特币（BTC）bech32 地址**：bc1qfe4nxcanet4w4ph8pf6qqyf263y68vw26nv9j9
-- **比特币（BTC）地址**：3PRyneb1D7jFFBakAaJiCRSsxsXAtMr7LN
+**比特币（BTC）地址**：bc1qfe4nxcanet4w4ph8pf6qqyf263y68vw26nv9j9
