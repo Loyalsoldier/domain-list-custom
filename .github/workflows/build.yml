@@ -69,36 +69,16 @@ jobs:
           git remote add publish "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
           git push -f publish release
 
-      - name: Create a release
+      - name: Release and upload assets
         if: ${{ env.NeedToSync }}
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
+          name: ${{ env.RELEASE_NAME }}
           tag_name: ${{ env.TAG_NAME }}
-          release_name: ${{ env.RELEASE_NAME }}
           draft: false
           prerelease: false
-
-      - name: Upload geosite.dat
-        if: ${{ env.NeedToSync }}
-        uses: actions/upload-release-asset@v1
+          files: |
+            ./publish/geosite.dat
+            ./publish/geosite.dat.sha256sum
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./publish/geosite.dat
-          asset_name: geosite.dat
-          asset_content_type: application/octet-stream
-
-      - name: Upload geosite.dat sha256sum
-        if: ${{ env.NeedToSync }}
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./publish/geosite.dat.sha256sum
-          asset_name: geosite.dat.sha256sum
-          asset_content_type: text/plain
