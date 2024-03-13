@@ -72,7 +72,7 @@ jobs:
 
       - name: Release and upload assets
         if: ${{ env.NeedToSync }}
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: ${{ env.RELEASE_NAME }}
           tag_name: ${{ env.TAG_NAME }}
