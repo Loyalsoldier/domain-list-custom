@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,7 +88,7 @@ func main() {
 			fmt.Println("Failed:", err)
 			os.Exit(1)
 		}
-		if err := ioutil.WriteFile(filepath.Join(*outputPath, *datName), protoBytes, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(*outputPath, *datName), protoBytes, 0644); err != nil {
 			fmt.Println("Failed:", err)
 			os.Exit(1)
 		} else {
@@ -101,7 +100,7 @@ func main() {
 	if filePlainTextBytesMap, err := listInfoMap.ToPlainText(exportListsSlice); err == nil {
 		for filename, plaintextBytes := range filePlainTextBytesMap {
 			filename += ".txt"
-			if err := ioutil.WriteFile(filepath.Join(*outputPath, filename), plaintextBytes, 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(*outputPath, filename), plaintextBytes, 0644); err != nil {
 				fmt.Println("Failed:", err)
 				os.Exit(1)
 			} else {
