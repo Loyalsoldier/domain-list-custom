@@ -43,8 +43,10 @@ jobs:
       - name: Append attribute rules
         if: ${{ env.NeedToSync }}
         run: |
-          echo "include:geolocation-!cn @cn" >> ./domain-list-community/data/cn
-          echo "include:geolocation-cn @!cn" >> ./domain-list-community/data/geolocation-\!cn
+          cp ./domain-list-community/data/geolocation-cn ./domain-list-community/data/geolocation-cn-v2fly
+          cp ./domain-list-community/data/geolocation-\!cn ./domain-list-community/data/geolocation-\!cn-v2fly
+          echo 'include:geolocation-!cn-v2fly @cn' >> ./domain-list-community/data/geolocation-cn
+          echo 'include:geolocation-cn-v2fly @!cn' >> ./domain-list-community/data/geolocation-\!cn
 
       - name: Get dependencies and run
         if: ${{ env.NeedToSync }}
