@@ -40,6 +40,14 @@ jobs:
           repository: v2fly/domain-list-community
           path: domain-list-community
 
+      - name: Temporarily remove upstream exclusive inclusions
+        if: ${{ env.NeedToSync }}
+        run: |
+          cd domain-list-community/data || exit 1
+          for cnlist in ./*-cn; do
+            sed -i 's/ @-!cn//' $cnlist
+          done
+
       - name: Append attribute rules
         if: ${{ env.NeedToSync }}
         run: |
