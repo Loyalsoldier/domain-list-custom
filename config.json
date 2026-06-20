@@ -1,0 +1,28 @@
+{
+  "input": [
+    {
+      "type": "domainlist",
+      "action": "add",
+      "args": {
+        "dataDir": "./data"
+      }
+    }
+  ],
+  "output": [
+    {
+      "type": "v2rayGeoSite",
+      "action": "output",
+      "args": {
+        "outputDir": "./output",
+        "outputName": "geosite.dat"
+      }
+    },
+    {
+      "type": "text",
+      "action": "output",
+      "args": {
+        "outputDir": "./output"
+      }
+    }
+  ]
+}

@@ -33,7 +33,7 @@ jobs:
         uses: actions/setup-go@v6
         if: ${{ env.NeedToSync }}
         with:
-          go-version-file: ./go.mod
+          go-version: '1.23'
 
       - name: Checkout v2fly/domain-list-community
         if: ${{ env.NeedToSync }}
@@ -48,10 +48,60 @@ jobs:
           echo "include:geolocation-!cn @cn" >> ./domain-list-community/data/cn
           echo "include:geolocation-cn @!cn" >> ./domain-list-community/data/geolocation-\!cn
 
-      - name: Get dependencies and run
+      - name: Create config.json
         if: ${{ env.NeedToSync }}
         run: |
-          go run ./ --datapath=./domain-list-community/data
+          cat > config.json <<'EOF'
+          {
+            "input": [
+              {
+                "type": "domainlist",
+                "action": "add",
+                "args": {
+                  "dataDir": "./domain-list-community/data"
+                }
+              }
+            ],
+            "output": [
+              {
+                "type": "v2rayGeoSite",
+                "action": "output",
+                "args": {
+                  "outputDir": "./publish",
+                  "outputName": "geosite.dat",
+                  "excludeAttrs": "cn@!cn@ads,geolocation-cn@!cn@ads,geolocation-!cn@cn@ads",
+                  "gfwlistOutput": "geolocation-!cn"
+                }
+              },
+              {
+                "type": "text",
+                "action": "output",
+                "args": {
+                  "outputDir": "./publish",
+                  "wantedList": [
+                    "category-ads-all",
+                    "tld-cn",
+                    "cn",
+                    "geolocation-cn",
+                    "tld-!cn",
+                    "geolocation-!cn",
+                    "private",
+                    "apple",
+                    "icloud",
+                    "google",
+                    "steam"
+                  ]
+                }
+              }
+            ]
+          }
+          EOF
+
+      - name: Build and run
+        if: ${{ env.NeedToSync }}
+        run: |
+          go build -v -o domain-list-custom
+          ./domain-list-custom convert -c config.json
 
       - name: Generate sha256 hashsum
         if: ${{ env.NeedToSync }}

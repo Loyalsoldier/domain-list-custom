@@ -1,0 +1,44 @@
+{
+  "input": [
+    {
+      "type": "domainlist",
+      "action": "add",
+      "args": {
+        "dataDir": "./data",
+        "wantedList": []
+      }
+    }
+  ],
+  "output": [
+    {
+      "type": "v2rayGeoSite",
+      "action": "output",
+      "args": {
+        "outputDir": "./output",
+        "outputName": "geosite.dat",
+        "excludeAttrs": "cn@!cn@ads,geolocation-cn@!cn@ads,geolocation-!cn@cn@ads",
+        "gfwlistOutput": "geolocation-!cn"
+      }
+    },
+    {
+      "type": "text",
+      "action": "output",
+      "args": {
+        "outputDir": "./output",
+        "wantedList": [
+          "category-ads-all",
+          "tld-cn",
+          "cn",
+          "geolocation-cn",
+          "tld-!cn",
+          "geolocation-!cn",
+          "private",
+          "apple",
+          "icloud",
+          "google",
+          "steam"
+        ]
+      }
+    }
+  ]
+}
