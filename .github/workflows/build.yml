@@ -30,7 +30,7 @@ jobs:
         if: ${{ env.NeedToSync }}
 
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         if: ${{ env.NeedToSync }}
         with:
           go-version-file: ./go.mod
