@@ -8,76 +8,115 @@ on:
       - master
     paths-ignore:
       - "**/README.md"
+  pull_request:
+    branches:
+      - master
+    paths-ignore:
+      - "**/README.md"
 permissions:
-  contents: write
+  contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      need_to_sync: ${{ steps.release.outputs.need_to_sync }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Compare latest tags and set variables
+        id: release
+        if: github.event_name != 'pull_request'
         run: |
-          upstreamLatestTag=$(curl -sSL --connect-timeout 5 --retry 5 -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/v2fly/domain-list-community/releases/latest | grep "tag_name" | cut -d\" -f4)
-          thisLatestTag=$(curl -sSL --connect-timeout 5 --retry 5 -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/${{ github.repository }}/releases/latest | grep "tag_name" | cut -d\" -f4)
-          if [[ $upstreamLatestTag != $thisLatestTag ]]; then
-            echo "NeedToSync=true" >> $GITHUB_ENV
+          upstreamLatestTag=$(curl -fsSL --connect-timeout 5 --retry 5 -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/v2fly/domain-list-community/releases/latest | jq -er '.tag_name | select(type == "string" and length > 0)')
+          thisLatestTag=$(curl -sSL --connect-timeout 5 --retry 5 -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" | jq -er 'if .message == "Not Found" then "" else .tag_name | select(type == "string") end')
+          if [[ "$upstreamLatestTag" != "$thisLatestTag" ]]; then
+            echo "need_to_sync=true" >> "$GITHUB_OUTPUT"
           fi
-          echo "RELEASE_NAME=$upstreamLatestTag" >> $GITHUB_ENV
-          echo "TAG_NAME=$upstreamLatestTag" >> $GITHUB_ENV
+          echo "tag_name=$upstreamLatestTag" >> "$GITHUB_OUTPUT"
         shell: bash
 
       - name: Checkout codebase
         uses: actions/checkout@v7
-        if: ${{ env.NeedToSync }}
+        with:
+          persist-credentials: false
 
       - name: Setup Go
         uses: actions/setup-go@v7
-        if: ${{ env.NeedToSync }}
         with:
           go-version-file: ./go.mod
 
+      - name: Test and vet
+        run: |
+          go test -race -timeout 60s ./...
+          go vet ./...
+
       - name: Checkout v2fly/domain-list-community
-        if: ${{ env.NeedToSync }}
+        if: github.event_name == 'pull_request' || steps.release.outputs.need_to_sync == 'true'
         uses: actions/checkout@v7
         with:
           repository: v2fly/domain-list-community
+          ref: ${{ steps.release.outputs.tag_name }}
           path: domain-list-community
+          persist-credentials: false
 
       - name: Append attribute rules
-        if: ${{ env.NeedToSync }}
+        if: github.event_name == 'pull_request' || steps.release.outputs.need_to_sync == 'true'
         run: |
-          echo "include:geolocation-!cn @cn" >> ./domain-list-community/data/cn
-          echo "include:geolocation-cn @!cn" >> ./domain-list-community/data/geolocation-\!cn
+          printf '\ninclude:geolocation-!cn @cn\n' >> ./domain-list-community/data/cn
+          printf '\ninclude:geolocation-cn @!cn\n' >> './domain-list-community/data/geolocation-!cn'
 
-      - name: Get dependencies and run
-        if: ${{ env.NeedToSync }}
+      - name: Generate domain lists
+        if: github.event_name == 'pull_request' || steps.release.outputs.need_to_sync == 'true'
         run: |
           go run ./ --datapath=./domain-list-community/data
 
-      - name: Generate sha256 hashsum
-        if: ${{ env.NeedToSync }}
-        run: |
-          cd publish || exit 1
-          sha256sum geosite.dat > geosite.dat.sha256sum
+      - name: Generate SHA-256 checksum
+        if: github.event_name == 'pull_request' || steps.release.outputs.need_to_sync == 'true'
+        working-directory: publish
+        run: sha256sum geosite.dat > geosite.dat.sha256sum
+
+      - name: Upload release artifacts
+        if: steps.release.outputs.need_to_sync == 'true'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: domain-lists
+          path: publish/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    if: github.event_name != 'pull_request' && needs.build.outputs.need_to_sync == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_NAME: ${{ needs.build.outputs.tag_name }}
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: domain-lists
+          path: publish
 
       - name: Git push assets to "release" branch
-        if: ${{ env.NeedToSync }}
+        working-directory: publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd publish || exit 1
-          git init
+          git init -b release
           git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b release
           git add .
-          git commit -m "${{ env.RELEASE_NAME }}"
-          git remote add publish "https://${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}"
-          git push -f publish release
+          git commit -m "$RELEASE_NAME"
+          git remote add publish "https://github.com/$GITHUB_REPOSITORY.git"
+          auth=$(printf '%s:%s' "$GITHUB_ACTOR" "$GITHUB_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push -f publish release
 
       - name: Release and upload assets
-        if: ${{ env.NeedToSync }}
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ env.RELEASE_NAME }}
-          tag_name: ${{ env.TAG_NAME }}
+          tag_name: ${{ needs.build.outputs.tag_name }}
           draft: false
           prerelease: false
           files: |

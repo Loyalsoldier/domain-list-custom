@@ -46,7 +46,7 @@ func NewDomainTrie() *DomainTrie {
 }
 
 // Insert inserts a domain rule string into the domain trie
-// and return whether is inserted successfully or not.
+// and returns whether it was inserted successfully.
 func (t *DomainTrie) Insert(domain string) (bool, error) {
 	if domain == "" {
 		return false, errors.New("empty domain")
@@ -62,12 +62,13 @@ func (t *DomainTrie) Insert(domain string) (bool, error) {
 		}
 		if !node.hasChild(part) {
 			node.addChild(part, newNode())
-			if i == 0 {
-				node.getChild(part).leaf = true
-				return true, nil
-			}
 		}
 		node = node.getChild(part)
 	}
-	return false, nil
+	if node.isLeaf() {
+		return false, nil
+	}
+	node.leaf = true
+	node.children = nil
+	return true, nil
 }

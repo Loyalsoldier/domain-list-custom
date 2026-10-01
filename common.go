@@ -24,12 +24,16 @@ func GetDataDir() string {
 	}
 
 	defaultDataDir := filepath.Join("./", "data")
-	if _, err := os.Stat(defaultDataDir); !os.IsNotExist(err) { // Use "./data" directory if exists
+	if info, err := os.Stat(defaultDataDir); err == nil && info.IsDir() { // Use "./data" directory if it exists
 		fmt.Printf("Use domain list files in '%s' directory.\n", defaultDataDir)
 		return defaultDataDir
 	}
 
-	return filepath.Join(GetGOPATH(), "src", "github.com", "v2fly", "domain-list-community", "data")
+	var goPath string
+	if paths := filepath.SplitList(GetGOPATH()); len(paths) > 0 {
+		goPath = paths[0]
+	}
+	return filepath.Join(goPath, "src", "github.com", "v2fly", "domain-list-community", "data")
 }
 
 // envFile returns the name of the Go environment configuration file.
@@ -61,7 +65,6 @@ func GetRuntimeEnv(key string) (string, error) {
 	if file == "" {
 		return "", fmt.Errorf("missing runtime env file")
 	}
-	var data []byte
 	var runtimeEnv string
 	data, readErr := os.ReadFile(file)
 	if readErr != nil {
@@ -70,9 +73,9 @@ func GetRuntimeEnv(key string) (string, error) {
 	envStrings := strings.Split(string(data), "\n")
 	for _, envItem := range envStrings {
 		envItem = strings.TrimSuffix(envItem, "\r")
-		envKeyValue := strings.Split(envItem, "=")
-		if strings.EqualFold(strings.TrimSpace(envKeyValue[0]), key) {
-			runtimeEnv = strings.TrimSpace(envKeyValue[1])
+		envKey, envValue, ok := strings.Cut(envItem, "=")
+		if ok && strings.EqualFold(strings.TrimSpace(envKey), key) {
+			runtimeEnv = strings.TrimSpace(envValue)
 		}
 	}
 	return runtimeEnv, nil

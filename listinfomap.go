@@ -23,6 +23,9 @@ func (lm *ListInfoMap) Marshal(path string) error {
 
 	list := NewListInfo()
 	listName := fileName(strings.ToUpper(filepath.Base(path)))
+	if _, exists := (*lm)[listName]; exists {
+		return fmt.Errorf("duplicate list name %s: %s", listName, path)
+	}
 	list.Name = listName
 	if err := list.ProcessList(file); err != nil {
 		return err
@@ -36,6 +39,13 @@ func (lm *ListInfoMap) Marshal(path string) error {
 // generates a domain trie for each file in data directory to
 // make the items of domain type list unique.
 func (lm *ListInfoMap) FlattenAndGenUniqueDomainList() error {
+	for _, list := range *lm {
+		for filename := range list.InclusionAttributeMap {
+			if (*lm)[filename] == nil {
+				return fmt.Errorf("%s includes missing list %s", list.Name, filename)
+			}
+		}
+	}
 	inclusionLevel := make([]map[fileName]bool, 0, 20)
 	okayList := make(map[fileName]bool)
 	inclusionLevelAllLength, loopTimes := 0, 0
@@ -67,6 +77,10 @@ func (lm *ListInfoMap) FlattenAndGenUniqueDomainList() error {
 					inclusionMap[listinfo.Name] = true
 				}
 			}
+		}
+
+		if len(inclusionMap) == 0 {
+			return errors.New("cyclic list inclusions")
 		}
 
 		for filename := range inclusionMap {
