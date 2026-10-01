@@ -13,8 +13,8 @@ import (
 )
 
 // ListInfo is the information structure of a single file in data directory.
-// It includes all types of rules of the file, as well as servel types of
-// sturctures of same items for convenience in later process.
+// It includes all types of rules of the file, as well as several types of
+// structures of same items for convenience in later process.
 type ListInfo struct {
 	Name                    fileName
 	HasInclusion            bool
@@ -87,8 +87,8 @@ func (l *ListInfo) parseRule(line string) (*router.Domain, error) {
 		return nil, nil
 	}
 
-	parts := strings.Split(line, " ")
-	ruleWithType := strings.TrimSpace(parts[0])
+	parts := strings.Fields(line)
+	ruleWithType := parts[0]
 	if ruleWithType == "" {
 		return nil, errors.New("empty rule")
 	}
@@ -133,7 +133,7 @@ func (l *ListInfo) parseInclusion(inclusion string) {
 }
 
 func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
-	kv := strings.Split(domain, ":")
+	kv := strings.SplitN(domain, ":", 2)
 	switch len(kv) {
 	case 1: // line without type prefix
 		rule.Type = router.Domain_RootDomain
@@ -155,6 +155,9 @@ func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
 		default:
 			return errors.New("unknown domain type: " + ruleType)
 		}
+	}
+	if rule.Value == "" {
+		return errors.New("empty rule value: " + domain)
 	}
 	return nil
 }
@@ -204,6 +207,9 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 		for filename, attrs := range l.InclusionAttributeMap {
 			for _, attrWanted := range attrs {
 				includedList := (*lm)[filename]
+				if includedList == nil {
+					return fmt.Errorf("list %s includes non-existent list %s", l.Name, filename)
+				}
 				switch string(attrWanted) {
 				case "@":
 					l.FullTypeList = append(l.FullTypeList, includedList.FullTypeList...)
@@ -255,7 +261,7 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 
 // ToGeoSite converts every ListInfo into a router.GeoSite structure.
 // It also excludes rules with certain attributes in certain files that
-// user specified in command line when runing the program.
+// user specified in command line when running the program.
 func (l *ListInfo) ToGeoSite(excludeAttrs map[fileName]map[attribute]bool) {
 	geosite := new(router.GeoSite)
 	geosite.CountryCode = string(l.Name)
@@ -289,7 +295,7 @@ func (l *ListInfo) ToGeoSite(excludeAttrs map[fileName]map[attribute]bool) {
 	l.GeoSite = geosite
 }
 
-// ToPlainText convert router.GeoSite structure to plaintext format.
+// ToPlainText converts router.GeoSite structure to plaintext format.
 func (l *ListInfo) ToPlainText() []byte {
 	plaintextBytes := make([]byte, 0, 1024*512)
 
@@ -327,7 +333,10 @@ func (l *ListInfo) ToPlainText() []byte {
 
 // ToGFWList converts router.GeoSite to GFWList format.
 func (l *ListInfo) ToGFWList() []byte {
-	loc, _ := time.LoadLocation("Asia/Shanghai")
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		loc = time.FixedZone("CST", 8*60*60)
+	}
 	timeString := fmt.Sprintf("! Last Modified: %s\n", time.Now().In(loc).Format(time.RFC1123))
 
 	gfwlistBytes := make([]byte, 0, 1024*512)
