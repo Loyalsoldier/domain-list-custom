@@ -13,8 +13,8 @@ import (
 )
 
 // ListInfo is the information structure of a single file in data directory.
-// It includes all types of rules of the file, as well as servel types of
-// sturctures of same items for convenience in later process.
+// It includes all types of rules in the file, as well as several
+// structures containing the same items for later processing.
 type ListInfo struct {
 	Name                    fileName
 	HasInclusion            bool
@@ -29,7 +29,7 @@ type ListInfo struct {
 	GeoSite                 *router.GeoSite
 }
 
-// NewListInfo return a ListInfo
+// NewListInfo returns a ListInfo.
 func NewListInfo() *ListInfo {
 	return &ListInfo{
 		InclusionAttributeMap:   make(map[fileName][]attribute),
@@ -48,7 +48,7 @@ func NewListInfo() *ListInfo {
 func (l *ListInfo) ProcessList(file *os.File) error {
 	scanner := bufio.NewScanner(file)
 	// Parse a file line by line to generate ListInfo
-	for scanner.Scan() {
+	for lineNumber := 1; scanner.Scan(); lineNumber++ {
 		line := scanner.Text()
 		if isEmpty(line) {
 			continue
@@ -59,7 +59,7 @@ func (l *ListInfo) ProcessList(file *os.File) error {
 		}
 		parsedRule, err := l.parseRule(line)
 		if err != nil {
-			return err
+			return fmt.Errorf("%s:%d: %w", file.Name(), lineNumber, err)
 		}
 		if parsedRule == nil {
 			continue
@@ -83,11 +83,10 @@ func (l *ListInfo) parseRule(line string) (*router.Domain, error) {
 
 	// Parse `include` rule first, eg: `include:google`, `include:google @cn @gfw`
 	if strings.HasPrefix(line, "include:") {
-		l.parseInclusion(line)
-		return nil, nil
+		return nil, l.parseInclusion(line)
 	}
 
-	parts := strings.Split(line, " ")
+	parts := strings.Fields(line)
 	ruleWithType := strings.TrimSpace(parts[0])
 	if ruleWithType == "" {
 		return nil, errors.New("empty rule")
@@ -111,29 +110,36 @@ func (l *ListInfo) parseRule(line string) (*router.Domain, error) {
 	return &rule, nil
 }
 
-func (l *ListInfo) parseInclusion(inclusion string) {
+func (l *ListInfo) parseInclusion(inclusion string) error {
 	inclusionVal := strings.TrimPrefix(strings.TrimSpace(inclusion), "include:")
-	l.HasInclusion = true
 	inclusionValSlice := strings.Split(inclusionVal, "@")
 	filename := fileName(strings.ToUpper(strings.TrimSpace(inclusionValSlice[0])))
+	if filename == "" {
+		return errors.New("empty inclusion filename")
+	}
+	var attrs []attribute
 	switch len(inclusionValSlice) {
 	case 1: // Inclusion without attribute
 		// Use '@' as the placeholder attribute for 'include:filename'
-		l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"))
+		attrs = append(attrs, attribute("@"))
 	default: // Inclusion with attribute(s)
 		// support new inclusion syntax, eg: `include:google @cn @gfw`
 		for _, attr := range inclusionValSlice[1:] {
 			attr = strings.ToLower(strings.TrimSpace(attr))
-			if attr != "" {
-				// Added in this format: '@cn'
-				l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attribute("@"+attr))
+			if attr == "" {
+				return errors.New("empty inclusion attribute")
 			}
+			// Added in this format: '@cn'
+			attrs = append(attrs, attribute("@"+attr))
 		}
 	}
+	l.HasInclusion = true
+	l.InclusionAttributeMap[filename] = append(l.InclusionAttributeMap[filename], attrs...)
+	return nil
 }
 
 func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
-	kv := strings.Split(domain, ":")
+	kv := strings.SplitN(domain, ":", 2)
 	switch len(kv) {
 	case 1: // line without type prefix
 		rule.Type = router.Domain_RootDomain
@@ -156,11 +162,14 @@ func (l *ListInfo) parseTypeRule(domain string, rule *router.Domain) error {
 			return errors.New("unknown domain type: " + ruleType)
 		}
 	}
+	if rule.Value == "" {
+		return errors.New("empty rule value")
+	}
 	return nil
 }
 
 func (l *ListInfo) parseAttribute(attr string) (*router.Domain_Attribute, error) {
-	if attr[0] != '@' {
+	if len(attr) < 2 || attr[0] != '@' {
 		return nil, errors.New("invalid attribute: " + attr)
 	}
 	attr = attr[1:] // Trim out attribute prefix `@` character
@@ -171,7 +180,7 @@ func (l *ListInfo) parseAttribute(attr string) (*router.Domain_Attribute, error)
 	return &attribute, nil
 }
 
-// classifyRule classifies a single rule and write into *ListInfo
+// classifyRule classifies a single rule and writes it into *ListInfo.
 func (l *ListInfo) classifyRule(rule *router.Domain) {
 	if len(rule.Attribute) > 0 {
 		l.AttributeRuleUniqueList = append(l.AttributeRuleUniqueList, rule)
@@ -195,15 +204,26 @@ func (l *ListInfo) classifyRule(rule *router.Domain) {
 }
 
 // Flatten flattens the rules in a file that have "include" syntax
-// in data directory, and adds those need-to-included rules into it.
+// in the data directory and adds the included rules to it.
 // This feature supports the "include:filename@attribute" syntax.
 // It also generates a domain trie of domain-typed rules for each file
 // to remove duplications of them.
 func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 	if l.HasInclusion {
 		for filename, attrs := range l.InclusionAttributeMap {
+			includedList := (*lm)[filename]
+			if includedList == nil {
+				return fmt.Errorf("%s includes missing list %s", l.Name, filename)
+			}
+			// An unfiltered inclusion supersedes all attribute filters.
+			for _, attr := range attrs {
+				if attr == "@" {
+					attrs = []attribute{"@"}
+					break
+				}
+			}
+			includedAttrs := make(map[attribute]bool)
 			for _, attrWanted := range attrs {
-				includedList := (*lm)[filename]
 				switch string(attrWanted) {
 				case "@":
 					l.FullTypeList = append(l.FullTypeList, includedList.FullTypeList...)
@@ -222,12 +242,10 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 						// will be like: "@cn@ads".
 						// So if to extract rules with a specific attribute, it is necessary
 						// also to test the multi-attribute keys of AttributeRuleListMap.
-						// Notice: if "include:google @cn" and "include:google @ads" appear
-						// at the same time in the parent list. There are chances that the same
-						// rule with that two attributes(`@cn` and `@ads`) will be included twice in the parent list.
-						if strings.Contains(string(attr)+"@", string(attrWanted)+"@") {
+						if !includedAttrs[attr] && strings.Contains(string(attr)+"@", string(attrWanted)+"@") {
 							l.AttributeRuleListMap[attr] = append(l.AttributeRuleListMap[attr], domainList...)
 							l.AttributeRuleUniqueList = append(l.AttributeRuleUniqueList, domainList...)
+							includedAttrs[attr] = true
 						}
 					}
 				}
@@ -236,7 +254,7 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 	}
 
 	sort.Slice(l.DomainTypeList, func(i, j int) bool {
-		return len(strings.Split(l.DomainTypeList[i].GetValue(), ".")) < len(strings.Split(l.DomainTypeList[j].GetValue(), "."))
+		return strings.Count(l.DomainTypeList[i].GetValue(), ".") < strings.Count(l.DomainTypeList[j].GetValue(), ".")
 	})
 
 	trie := NewDomainTrie()
@@ -255,7 +273,7 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 
 // ToGeoSite converts every ListInfo into a router.GeoSite structure.
 // It also excludes rules with certain attributes in certain files that
-// user specified in command line when runing the program.
+// the user specified on the command line when running the program.
 func (l *ListInfo) ToGeoSite(excludeAttrs map[fileName]map[attribute]bool) {
 	geosite := new(router.GeoSite)
 	geosite.CountryCode = string(l.Name)
@@ -289,7 +307,7 @@ func (l *ListInfo) ToGeoSite(excludeAttrs map[fileName]map[attribute]bool) {
 	l.GeoSite = geosite
 }
 
-// ToPlainText convert router.GeoSite structure to plaintext format.
+// ToPlainText converts a router.GeoSite structure to plaintext format.
 func (l *ListInfo) ToPlainText() []byte {
 	plaintextBytes := make([]byte, 0, 1024*512)
 
@@ -327,7 +345,7 @@ func (l *ListInfo) ToPlainText() []byte {
 
 // ToGFWList converts router.GeoSite to GFWList format.
 func (l *ListInfo) ToGFWList() []byte {
-	loc, _ := time.LoadLocation("Asia/Shanghai")
+	loc := time.FixedZone("CST", 8*60*60)
 	timeString := fmt.Sprintf("! Last Modified: %s\n", time.Now().In(loc).Format(time.RFC1123))
 
 	gfwlistBytes := make([]byte, 0, 1024*512)
@@ -347,10 +365,10 @@ func (l *ListInfo) ToGFWList() []byte {
 
 		switch rule.Type {
 		case router.Domain_Full:
-			gfwlistBytes = append(gfwlistBytes, []byte("|http://"+ruleVal+"\n")...)
-			gfwlistBytes = append(gfwlistBytes, []byte("|https://"+ruleVal+"\n")...)
+			gfwlistBytes = append(gfwlistBytes, []byte("|http://"+ruleVal+"^\n")...)
+			gfwlistBytes = append(gfwlistBytes, []byte("|https://"+ruleVal+"^\n")...)
 		case router.Domain_RootDomain:
-			gfwlistBytes = append(gfwlistBytes, []byte("||"+ruleVal+"\n")...)
+			gfwlistBytes = append(gfwlistBytes, []byte("||"+ruleVal+"^\n")...)
 		case router.Domain_Plain:
 			gfwlistBytes = append(gfwlistBytes, []byte(ruleVal+"\n")...)
 		case router.Domain_Regex:
