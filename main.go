@@ -16,7 +16,7 @@ var (
 	datName      = flag.String("datname", "geosite.dat", "Name of the generated dat file")
 	outputPath   = flag.String("outputpath", "./publish", "Output path to the generated files")
 	exportLists  = flag.String("exportlists", "category-ads-all,tld-cn,cn,geolocation-cn,tld-!cn,geolocation-!cn,private,apple,icloud,google,steam", "Lists to be exported in plaintext format, separated by ',' comma")
-	excludeAttrs = flag.String("excludeattrs", "cn@!cn@ads,geolocation-cn@!cn@ads,geolocation-!cn@cn@ads", "Exclude rules with certain attributes in certain lists, seperated by ',' comma, support multiple attributes in one list. Example: geolocation-!cn@cn@ads,geolocation-cn@!cn")
+	excludeAttrs = flag.String("excludeattrs", "cn@!cn@ads,geolocation-cn@!cn@ads,geolocation-!cn@cn@ads", "Exclude rules with certain attributes in certain lists, separated by ',' comma, support multiple attributes in one list. Example: geolocation-!cn@cn@ads,geolocation-cn@!cn")
 	toGFWList    = flag.String("togfwlist", "geolocation-!cn", "List to be exported in GFWList format")
 )
 
@@ -77,7 +77,7 @@ func main() {
 		}
 	}
 
-	// Generate dlc.dat
+	// Generate geosite.dat
 	if geositeList := listInfoMap.ToProto(excludeAttrsInFile); geositeList != nil {
 		protoBytes, err := proto.Marshal(geositeList)
 		if err != nil {
@@ -114,16 +114,11 @@ func main() {
 
 	// Generate gfwlist.txt
 	if gfwlistBytes, err := listInfoMap.ToGFWList(*toGFWList); err == nil {
-		if f, err := os.OpenFile(filepath.Join(*outputPath, "gfwlist.txt"), os.O_RDWR|os.O_CREATE, 0644); err != nil {
+		encoded := []byte(base64.StdEncoding.EncodeToString(gfwlistBytes))
+		if err := os.WriteFile(filepath.Join(*outputPath, "gfwlist.txt"), encoded, 0644); err != nil {
 			fmt.Println("Failed:", err)
 			os.Exit(1)
 		} else {
-			encoder := base64.NewEncoder(base64.StdEncoding, f)
-			defer encoder.Close()
-			if _, err := encoder.Write(gfwlistBytes); err != nil {
-				fmt.Println("Failed:", err)
-				os.Exit(1)
-			}
 			fmt.Printf("gfwlist.txt has been generated successfully in '%s'.\n", *outputPath)
 		}
 	} else {

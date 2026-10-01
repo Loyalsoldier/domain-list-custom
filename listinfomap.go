@@ -69,6 +69,16 @@ func (lm *ListInfoMap) FlattenAndGenUniqueDomainList() error {
 			}
 		}
 
+		if len(inclusionMap) == 0 {
+			unresolved := make([]string, 0)
+			for name := range *lm {
+				if !okayList[name] {
+					unresolved = append(unresolved, string(name))
+				}
+			}
+			return fmt.Errorf("cannot resolve inclusions (missing or circular) in lists: %s", strings.Join(unresolved, ", "))
+		}
+
 		for filename := range inclusionMap {
 			okayList[filename] = true
 		}

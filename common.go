@@ -70,9 +70,9 @@ func GetRuntimeEnv(key string) (string, error) {
 	envStrings := strings.Split(string(data), "\n")
 	for _, envItem := range envStrings {
 		envItem = strings.TrimSuffix(envItem, "\r")
-		envKeyValue := strings.Split(envItem, "=")
-		if strings.EqualFold(strings.TrimSpace(envKeyValue[0]), key) {
-			runtimeEnv = strings.TrimSpace(envKeyValue[1])
+		k, v, found := strings.Cut(envItem, "=")
+		if found && strings.EqualFold(strings.TrimSpace(k), key) {
+			runtimeEnv = strings.TrimSpace(v)
 		}
 	}
 	return runtimeEnv, nil
