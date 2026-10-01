@@ -5,6 +5,11 @@
 *.so
 *.dylib
 
+# Generated lists, local binary, and upstream checkout
+/publish/
+/domain-list-custom
+/domain-list-community/
+
 # Test binary, built with `go test -c`
 *.test
 
