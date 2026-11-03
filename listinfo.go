@@ -13,8 +13,8 @@ import (
 )
 
 // ListInfo is the information structure of a single file in data directory.
-// It includes all types of rules of the file, as well as servel types of
-// sturctures of same items for convenience in later process.
+// It includes all types of rules of the file, as well as several types of
+// structures of same items for convenience in later process.
 type ListInfo struct {
 	Name                    fileName
 	HasInclusion            bool
@@ -255,7 +255,7 @@ func (l *ListInfo) Flatten(lm *ListInfoMap) error {
 
 // ToGeoSite converts every ListInfo into a router.GeoSite structure.
 // It also excludes rules with certain attributes in certain files that
-// user specified in command line when runing the program.
+// user specified in command line when running the program.
 func (l *ListInfo) ToGeoSite(excludeAttrs map[fileName]map[attribute]bool) {
 	geosite := new(router.GeoSite)
 	geosite.CountryCode = string(l.Name)
